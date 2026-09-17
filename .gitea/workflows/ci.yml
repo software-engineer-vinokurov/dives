@@ -13,7 +13,6 @@ concurrency:
 
 jobs:
   checks:
-    if: ${{ github.event_name != 'pull_request' || !startsWith(gitea.head_ref, 'renovate/') }}
     name: Lint, test, and build
     runs-on: ${{ github.ref == 'refs/heads/main' && 'pumpking-main' || 'pumpking-pr' }}
     timeout-minutes: 20
@@ -114,7 +113,7 @@ jobs:
     # workflow via `needs` closes that race by construction, as well as the more obvious problem it
     # was already masking: deploy previously had no dependency on checks at all, so a broken/
     # failing build could still roll out to dev-dives.
-    if: ${{ (github.event_name != 'pull_request' || !startsWith(gitea.head_ref, 'renovate/')) && (github.ref == 'refs/heads/main' && github.event_name == 'push') }}
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ${{ github.ref == 'refs/heads/main' && 'pumpking-main' || 'pumpking-pr' }}
     steps:
       - uses: actions/checkout@v4
