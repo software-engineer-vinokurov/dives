@@ -1,0 +1,13 @@
+{
+  "name": "garmin-sidecar",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stateless pod-local HTTP sidecar for Garmin Connect integration",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "garmin-connect": "^1.6.0"
+  }
+}

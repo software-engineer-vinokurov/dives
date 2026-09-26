@@ -217,3 +217,57 @@ export async function seedSuuntoImport(
 
   return { importId: result.rows[0].id, workoutKey };
 }
+
+export async function seedGarminIntegration(email: string): Promise<void> {
+  const user = await pool.query<{ id: number }>("select id from users where email = $1", [email]);
+  if (user.rows.length === 0) throw new Error(`no user found for email ${email}`);
+
+  await pool.query(
+    `insert into garmin_integrations (user_id, email_hash, session_encrypted, status)
+     values ($1, $2, 'e2e-not-a-real-session', 'connected')`,
+    [user.rows[0].id, `e2e-${randomBytes(8).toString("hex")}`],
+  );
+}
+
+export async function seedGarminImport(
+  email: string,
+  draftDive: DraftDiveFields,
+): Promise<{ importId: number; activityId: string }> {
+  const user = await pool.query<{ id: number }>("select id from users where email = $1", [email]);
+  if (user.rows.length === 0) throw new Error(`no user found for email ${email}`);
+
+  const activityId = `e2e-garmin-${randomBytes(6).toString("hex")}`;
+  const compiledProfile = {
+    source: "garmin",
+    version: 1,
+    activityId,
+    startedAt: draftDive.occurredAt ?? null,
+    durationMinutes: null,
+    maxDepth: draftDive.maxDepth ?? null,
+    averageDepth: null,
+    waterTemperature: null,
+    waterTemperatureLow: null,
+    surfaceTemperature: null,
+    gasMix: null,
+    points: [],
+    depthProfile: null,
+    depthProfileRaw: null,
+  };
+
+  const result = await pool.query<{ id: number }>(
+    `insert into garmin_imports
+       (user_id, activity_id, activity_started_at, summary, draft_dive, compiled_profile, original_fit, updated_at)
+     values ($1, $2, $3, '{}'::jsonb, $4::jsonb, $5::jsonb, $6, now())
+     returning id`,
+    [
+      user.rows[0].id,
+      activityId,
+      draftDive.occurredAt ?? null,
+      JSON.stringify(draftDive),
+      JSON.stringify(compiledProfile),
+      Buffer.from(""),
+    ],
+  );
+
+  return { importId: result.rows[0].id, activityId };
+}

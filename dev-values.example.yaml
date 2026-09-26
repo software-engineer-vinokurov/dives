@@ -29,6 +29,8 @@ appSecrets:
   PADI_USERNAME_HASH_PEPPER: "replace-with-padi-username-hash-pepper"
   SUUNTO_SESSION_ENCRYPTION_KEY: "replace-with-suunto-session-encryption-key"
   SUUNTO_EMAIL_HASH_PEPPER: "replace-with-suunto-email-hash-pepper"
+  GARMIN_SESSION_ENCRYPTION_KEY: "replace-with-garmin-session-encryption-key"
+  GARMIN_EMAIL_HASH_PEPPER: "replace-with-garmin-email-hash-pepper"
   GITEA_TOKEN: "replace-with-gitea-feedback-token"
 
 notifications:
@@ -43,6 +45,13 @@ suuntoSidecar:
     # Defaults to the deployed app image when empty.
     repository: ""
     tag: ""
+  image:
+    repository: registry.pumpking.aleksandr.vin/dives/web
+    tag: amnesiac
+
+
+garminSidecar:
+  enabled: true
   image:
     repository: registry.pumpking.aleksandr.vin/dives/web
     tag: amnesiac

@@ -2,22 +2,25 @@ import type { DiveSnapshot } from "./dives";
 
 export const MISSING_PADI_TAG = "missing-padi";
 export const MISSING_SUUNTO_TAG = "missing-suunto";
+export const MISSING_GARMIN_TAG = "missing-garmin";
 
 export type IntegrationConnections = {
   padiConnected: boolean;
   suuntoConnected: boolean;
+  garminConnected: boolean;
 };
 
-type TaggableDive = Pick<DiveSnapshot, "tags" | "padi_dive_id" | "suunto_workout_key">;
+type TaggableDive = Pick<DiveSnapshot, "tags" | "padi_dive_id" | "suunto_workout_key" | "garmin_activity_id">;
 
-// "missing-padi"/"missing-suunto" are never written to the tags column -- they're derived here
-// from padi_dive_id/suunto_workout_key plus the user's current integration status, so a dive that
+// "missing-padi"/"missing-suunto"/"missing-garmin" are never written to the tags column -- they're derived here
+// from padi_dive_id/suunto_workout_key/garmin_activity_id plus the user's current integration status, so a dive that
 // gets synced later (or an integration that gets connected/disconnected) never needs a backfill to
 // stay correct.
 export function effectiveTags(dive: TaggableDive, connections: IntegrationConnections): string[] {
   const tags = [...dive.tags];
   if (connections.padiConnected && dive.padi_dive_id === null) tags.push(MISSING_PADI_TAG);
   if (connections.suuntoConnected && dive.suunto_workout_key === null) tags.push(MISSING_SUUNTO_TAG);
+  if (connections.garminConnected && dive.garmin_activity_id === null) tags.push(MISSING_GARMIN_TAG);
   return tags;
 }
 

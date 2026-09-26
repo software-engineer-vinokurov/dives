@@ -230,6 +230,43 @@ spec:
           resources:
             {{- toYaml .Values.suuntoSidecar.resources | nindent 12 }}
         {{- end }}
+        {{- if .Values.garminSidecar.enabled }}
+        - name: garmin-sidecar
+          image: {{ default .Values.image.repository .Values.garminSidecar.image.repository }}:{{ default .Values.image.tag .Values.garminSidecar.image.tag }}
+          imagePullPolicy: {{ .Values.garminSidecar.image.pullPolicy }}
+          command: ["node"]
+          args: ["scripts/garmin-sidecar/server.mjs"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: GARMIN_SIDECAR_HOST
+              value: "127.0.0.1"
+            - name: GARMIN_SIDECAR_PORT
+              value: {{ .Values.garminSidecar.port | quote }}
+          ports:
+            - name: garmin
+              containerPort: {{ .Values.garminSidecar.port }}
+          livenessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.garminSidecar.port }}/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.garminSidecar.port }}/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.garminSidecar.resources | nindent 12 }}
+        {{- end }}
       volumes:
         - name: configs
           configMap:

@@ -114,6 +114,8 @@ export type DiveSnapshot = {
   // The original bundle blob is intentionally not part of snapshots/backups/DTOs.
   suunto_workout_key: string | null;
   suunto_profile: unknown;
+  garmin_activity_id: string | null;
+  garmin_profile: unknown;
   // User-supplied free-text tags (migration 027). "missing-padi"/"missing-suunto" are never stored
   // here -- see lib/tags.ts's effectiveTags(), which derives them from padi_dive_id/
   // suunto_workout_key plus the user's integration status instead, so they can't go stale.
@@ -226,6 +228,8 @@ const snapshotColumns = `
   d.padi_last_compared_at,
   d.suunto_workout_key,
   d.suunto_profile,
+  d.garmin_activity_id,
+  d.garmin_profile,
   d.tags,
   s.name as site_name,
   s.location as site_location,
@@ -620,6 +624,26 @@ export async function getDiveSuuntoOriginalBundle(
 // rather than an error), same exclusion from snapshotColumns. Callers pass ids in bounded chunks --
 // each row carries a whole gzipped export, so "select every bundle at once" would trade N round
 // trips for one unbounded result set.
+
+export async function getDiveGarminOriginalFit(
+  userId: string,
+  diveId: number,
+): Promise<{ activityId: string; originalFit: Buffer } | null> {
+  const result = await queryRead<{ garmin_activity_id: string | null; garmin_original_fit: Buffer | null }>(
+    `
+      select d.garmin_activity_id, d.garmin_original_fit
+      from dives d
+      where d.id = $1
+        and d.user_id = $2
+    `,
+    [diveId, userId],
+  );
+
+  const row = result.rows[0];
+  if (!row || row.garmin_activity_id === null || row.garmin_original_fit === null) return null;
+  return { activityId: row.garmin_activity_id, originalFit: row.garmin_original_fit };
+}
+
 export async function getDiveSuuntoOriginalBundles(
   userId: string,
   diveIds: number[],
@@ -673,6 +697,32 @@ export type RecentCylinder = {
   tankInfo: string | null;
   cylinderSize: string | null;
 };
+
+
+export type GarminMergeDiveCandidate = DiveRecord;
+
+export async function listGarminMergeDiveCandidates(
+  userId: string,
+  preferredAt: Date | string | null,
+): Promise<GarminMergeDiveCandidate[]> {
+  const preferred = preferredAt ? new Date(preferredAt) : null;
+  const result = await queryRead<GarminMergeDiveCandidate>(
+    `
+      select ${snapshotColumns}, d.dive_site_id
+      ${diveFrom}
+      where d.user_id = $1
+        and d.garmin_activity_id is null
+      order by
+        case when $2::timestamptz is null then 1 else 0 end,
+        case when $2::timestamptz is null then null else abs(extract(epoch from (d.occurred_at - $2::timestamptz))) end asc,
+        d.occurred_at desc,
+        d.id desc
+      limit 25
+    `,
+    [userId, preferred && Number.isFinite(preferred.getTime()) ? preferred : null],
+  );
+  return result.rows;
+}
 
 export type SuuntoMergeDiveCandidate = DiveRecord;
 
@@ -1084,6 +1134,86 @@ export async function createDiveFromSuuntoImport(
   });
 }
 
+
+export type CreateDiveFromGarminImportResult =
+  | { inserted: true; dive: DiveSnapshot }
+  | { inserted: false; reason: "already_saved" | "missing_import" };
+
+export async function createDiveFromGarminImport(
+  owner: DiveOwner,
+  garminImportId: number,
+  input: DiveInput,
+): Promise<CreateDiveFromGarminImportResult> {
+  return inTransaction(async (client) => {
+    const source = await client.query<{
+      activity_id: string;
+      compiled_profile: unknown;
+      original_fit: Buffer;
+    }>(
+      `
+        select activity_id, compiled_profile, original_fit
+        from garmin_imports
+        where id = $1
+          and user_id = $2
+        for update
+      `,
+      [garminImportId, owner.id],
+    );
+
+    const row = source.rows[0];
+    if (!row) {
+      return { inserted: false, reason: "missing_import" };
+    }
+
+    const diveSiteId = await resolveDiveSiteId(client, owner.id, input.site);
+
+    const inserted = await client.query<{ id: number }>(
+      `
+        insert into dives (
+          user_id, dive_site_id, title, occurred_at, max_depth, avg_depth, bottom_time_minutes,
+          water_temp, water_temp_low, air_temp, visibility, gas_mix, tank_info, cylinder_size,
+          start_pressure, end_pressure, weight, weight_feedback, suit_type, hood, gloves, boots,
+          buddy, dive_shop, current, surge, waves, weather, water_type, body_of_water,
+          entry_type, notes, rating, depth_profile, depth_profile_raw, tags,
+          garmin_activity_id, garmin_profile, garmin_original_fit
+        )
+        values (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+          $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36,
+          $37, $38::jsonb, $39
+        )
+        on conflict (user_id, garmin_activity_id) where garmin_activity_id is not null do nothing
+        returning id
+      `,
+      [
+        owner.id,
+        ...diveValues(diveSiteId, input),
+        row.activity_id,
+        JSON.stringify(row.compiled_profile),
+        row.original_fit,
+      ],
+    );
+
+    if (inserted.rows.length === 0) {
+      await client.query("delete from garmin_imports where id = $1 and user_id = $2", [
+        garminImportId,
+        owner.id,
+      ]);
+      return { inserted: false, reason: "already_saved" };
+    }
+
+    await client.query("delete from garmin_imports where id = $1 and user_id = $2", [
+      garminImportId,
+      owner.id,
+    ]);
+
+    const snapshot = await loadSnapshot(client, owner.id, inserted.rows[0].id);
+    await enqueueDiveBackup(client, owner, "create", snapshot);
+
+    return { inserted: true, dive: snapshot };
+  });
+}
+
 export async function mergeSuuntoImportIntoDive(
   owner: DiveOwner,
   suuntoImportId: number,
@@ -1210,6 +1340,147 @@ export async function mergeSuuntoImportIntoDive(
 
     await client.query("delete from suunto_imports where id = $1 and user_id = $2", [
       suuntoImportId,
+      owner.id,
+    ]);
+
+    const snapshot = await loadSnapshot(client, owner.id, targetDiveId);
+    await enqueueDiveBackup(client, owner, "edit", snapshot);
+
+    return { merged: true, dive: snapshot };
+  });
+}
+
+
+export type MergeGarminImportIntoDiveResult =
+  | { merged: true; dive: DiveSnapshot }
+  | { merged: false; reason: "missing_dive" | "already_saved" | "missing_import" };
+
+export async function mergeGarminImportIntoDive(
+  owner: DiveOwner,
+  garminImportId: number,
+  targetDiveId: number,
+  input: DiveInput,
+): Promise<MergeGarminImportIntoDiveResult> {
+  return inTransaction(async (client) => {
+    const source = await client.query<{
+      activity_id: string;
+      compiled_profile: unknown;
+      original_fit: Buffer;
+    }>(
+      `
+        select activity_id, compiled_profile, original_fit
+        from garmin_imports
+        where id = $1
+          and user_id = $2
+        for update
+      `,
+      [garminImportId, owner.id],
+    );
+
+    const row = source.rows[0];
+    if (!row) return { merged: false, reason: "missing_import" };
+
+    const target = await client.query<{ garmin_activity_id: string | null }>(
+      `
+        select garmin_activity_id
+        from dives
+        where id = $1
+          and user_id = $2
+        for update
+      `,
+      [targetDiveId, owner.id],
+    );
+
+    if (!target.rows[0]) return { merged: false, reason: "missing_dive" };
+    if (target.rows[0].garmin_activity_id && target.rows[0].garmin_activity_id !== row.activity_id) {
+      return { merged: false, reason: "already_saved" };
+    }
+
+    const duplicate = await client.query<{ exists: boolean }>(
+      `
+        select exists(
+          select 1 from dives
+          where user_id = $1
+            and garmin_activity_id = $2
+            and id <> $3
+        ) as exists
+      `,
+      [owner.id, row.activity_id, targetDiveId],
+    );
+
+    if (duplicate.rows[0]?.exists) {
+      await client.query("delete from garmin_imports where id = $1 and user_id = $2", [
+        garminImportId,
+        owner.id,
+      ]);
+      return { merged: false, reason: "already_saved" };
+    }
+
+    const diveSiteId = await resolveDiveSiteId(client, owner.id, input.site);
+
+    const updated = await client.query(
+      `
+        update dives set
+          dive_site_id = $3,
+          title = $4,
+          occurred_at = $5,
+          max_depth = $6,
+          avg_depth = $7,
+          bottom_time_minutes = $8,
+          water_temp = $9,
+          water_temp_low = $10,
+          air_temp = $11,
+          visibility = $12,
+          gas_mix = $13,
+          tank_info = $14,
+          cylinder_size = $15,
+          start_pressure = $16,
+          end_pressure = $17,
+          weight = $18,
+          weight_feedback = $19,
+          suit_type = $20,
+          hood = $21,
+          gloves = $22,
+          boots = $23,
+          buddy = $24,
+          dive_shop = $25,
+          current = $26,
+          surge = $27,
+          waves = $28,
+          weather = $29,
+          water_type = $30,
+          body_of_water = $31,
+          entry_type = $32,
+          notes = $33,
+          rating = $34,
+          depth_profile = $35,
+          depth_profile_raw = $36,
+          tags = $37,
+          garmin_activity_id = $38,
+          garmin_profile = $39::jsonb,
+          garmin_original_fit = $40,
+          padi_needs_update = case
+            when padi_dive_id is not null and log_type = 'Recreational' and log_course is null then true
+            else padi_needs_update
+          end,
+          updated_at = now()
+        where id = $1
+          and user_id = $2
+      `,
+      [
+        targetDiveId,
+        owner.id,
+        ...diveValues(diveSiteId, input),
+        row.activity_id,
+        JSON.stringify(row.compiled_profile),
+        row.original_fit,
+      ],
+    );
+
+    if (updated.rowCount === 0) return { merged: false, reason: "missing_dive" };
+
+    await client.query("delete from garmin_imports where id = $1 and user_id = $2", [
+      garminImportId,
       owner.id,
     ]);
 

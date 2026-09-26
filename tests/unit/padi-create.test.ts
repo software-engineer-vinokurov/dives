@@ -52,6 +52,8 @@ const baseDive: DiveRecord = {
   padi_last_compared_at: null,
   suunto_workout_key: null,
   suunto_profile: null,
+  garmin_activity_id: null,
+  garmin_profile: null,
   tags: [],
   site_name: "TODI",
   site_location: "Beringen, Belgium",

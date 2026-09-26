@@ -21,11 +21,13 @@
     "padi:refresh": "node scripts/padi-token-refresh.mjs",
     "padi:debug-logbook": "node scripts/padi/debug-logbook.mjs",
     "suunto:sidecar": "node scripts/suunto-sidecar/server.mjs",
+    "garmin:sidecar": "node scripts/garmin-sidecar/server.mjs",
     "suunto:backfill-gas-rate": "tsx scripts/backfill-suunto-gas-rate.ts",
     "backfills:run": "node scripts/run-backfills.mjs",
     "lint:unused": "knip"
   },
   "dependencies": {
+    "@garmin/fitsdk": "^21.217.0",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.78.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.222.0",

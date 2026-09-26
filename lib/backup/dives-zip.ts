@@ -3,7 +3,7 @@ import "server-only";
 import JSZip from "jszip";
 
 import { listBookmarks } from "@/lib/bookmarks";
-import { getDiveSuuntoOriginalBundles, listDiveSites, listDivesForBackup } from "@/lib/dives";
+import { getDiveGarminOriginalFit, getDiveSuuntoOriginalBundles, listDiveSites, listDivesForBackup } from "@/lib/dives";
 import { logger } from "@/lib/logger";
 import { mapWithConcurrency } from "@/lib/padi/concurrency";
 import { extractAllFiles } from "@/lib/suunto/raw-bundle";
@@ -135,6 +135,23 @@ export async function buildDivesBackupZip(userId: string): Promise<Buffer> {
         }
       },
     );
+  }
+
+  
+  const garminDiveIds = dives.filter((dive) => dive.garmin_activity_id !== null).map((dive) => dive.id);
+
+  for (const diveIdChunk of chunk(garminDiveIds, BUNDLE_BATCH_SIZE)) {
+    // We could mapWithConcurrency over this, but since it's just fetching one file per dive, let's keep it simple
+    for (const diveId of diveIdChunk) {
+      const bundle = await getDiveGarminOriginalFit(userId, diveId);
+      if (bundle) {
+        totalBundleBytes += bundle.originalFit.byteLength;
+        if (totalBundleBytes > MAX_TOTAL_BUNDLE_BYTES) {
+          throw new BackupTooLargeError();
+        }
+        zip.file(`garmin/${diveId}/${bundle.activityId}_ACTIVITY.zip`, bundle.originalFit);
+      }
+    }
   }
 
   return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });

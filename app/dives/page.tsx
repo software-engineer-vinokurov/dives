@@ -4,6 +4,7 @@ import { Plus, Star, Tag, UploadCloud, Waves, X } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { FetchSuuntoButton, type SuuntoFetchStatus } from "@/components/fetch-suunto-button";
+import { FetchGarminButton, type GarminFetchStatus } from "@/components/fetch-garmin-button";
 import { SyncPadiButton, type PadiSyncStatus } from "@/components/sync-padi-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { listDives } from "@/lib/dives";
 import { getPadiIntegrationStatus } from "@/lib/padi/integrations";
 import { requireUser } from "@/lib/session";
 import { getSuuntoIntegrationStatus } from "@/lib/suunto/integrations";
+import { getGarminIntegrationStatus } from "@/lib/garmin/integrations";
 import { buildTagCloud, effectiveTags, MISSING_PADI_TAG, MISSING_SUUNTO_TAG } from "@/lib/tags";
 import { cn } from "@/lib/utils";
 
@@ -59,17 +61,20 @@ export default async function DivesPage({
   const params = await searchParams;
   const activeTag = Array.isArray(params?.tag) ? params.tag[0] : params?.tag;
 
-  const [dives, padiIntegration, suuntoIntegration] = await Promise.all([
+  const [dives, padiIntegration, suuntoIntegration, garminIntegration] = await Promise.all([
     listDives(user.id),
     getPadiIntegrationStatus(user.id),
     getSuuntoIntegrationStatus(user.id),
+    getGarminIntegrationStatus(user.id),
   ]);
   const connections = {
     padiConnected: padiIntegration?.status === "connected",
     suuntoConnected: suuntoIntegration?.status === "connected",
+    garminConnected: garminIntegration?.status === "connected",
   };
   const padiSyncStatus: PadiSyncStatus = padiIntegration ? padiIntegration.status : "not_connected";
   const suuntoFetchStatus: SuuntoFetchStatus = suuntoIntegration ? suuntoIntegration.status : "not_connected";
+  const garminFetchStatus: GarminFetchStatus = garminIntegration ? garminIntegration.status : "not_connected";
   const tagCloud = buildTagCloud(dives, connections);
 
   // Dive numbers (#1, #2, ...) count from the oldest dive across the whole logbook, so filtering
@@ -94,6 +99,7 @@ export default async function DivesPage({
           <div className="flex flex-wrap gap-2">
             <SyncPadiButton status={padiSyncStatus} />
             <FetchSuuntoButton status={suuntoFetchStatus} />
+            <FetchGarminButton status={garminFetchStatus} />
             <Link href="/dives/new" className={cn(buttonVariants(), "no-underline")}>
               <Plus /> Log a dive
             </Link>
