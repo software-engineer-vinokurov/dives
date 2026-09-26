@@ -178,3 +178,25 @@ persistentVolume:
   size: 1Gi
   # -- PV name
   volumeName: pv-dives
+
+keda:
+  # -- Set to true to scale the web Deployment to 0 replicas when idle, waking
+  # on the first incoming HTTP request. Requires the KEDA + KEDA HTTP Add-on
+  # operators already installed cluster-wide (namespace `keda`) --
+  # see pumpking/changelog/2026-09-26-install-keda-http-add-on.md.
+  # Only scales the *web* Deployment: the notification-worker and
+  # padi-token-refresh CronJobs are separate resources, unaffected either way.
+  # NOTE: while scaled to 0, the in-app healthcheck ping (env.HEALTHCHECK_PING_URL,
+  # currently unset for this project) would stop firing during idle periods --
+  # same tradeoff luglab hit, see its docs/deployment.md.
+  enabled: false
+  namespace: keda
+  interceptorProxyService: keda-add-ons-http-interceptor-proxy
+  interceptorProxyPort: 8080
+  externalScalerAddress: keda-add-ons-http-external-scaler.keda:9090
+  minReplicaCount: 0
+  maxReplicaCount: 3
+  cooldownPeriod: 300
+  requestRateTargetValue: 5
+  requestRateWindow: 1m
+  requestRateGranularity: 1s

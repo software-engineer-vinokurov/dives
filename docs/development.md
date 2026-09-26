@@ -721,7 +721,9 @@ rather than calling out with an empty token.
 `app/api/health/route.ts` responds to health probes (used by the Helm
 deployment's liveness/readiness checks) and also pings an external monitor
 via `lib/healthcheck-ping.ts` when `HEALTHCHECK_PING_URL` is set. Leave it
-unset locally — the ping is a no-op without it.
+unset locally — the ping is a no-op without it. See
+[`docs/deployment.md`](./deployment.md) for how this would interact with
+scale-to-zero if ever enabled.
 
 ## OpenTelemetry
 

@@ -1,0 +1,78 @@
+{{- if .Values.keda.enabled }}
+apiVersion: http.keda.sh/v1beta1
+kind: InterceptorRoute
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  target:
+    service: {{ .Release.Name }}-service
+    port: {{ .Values.service.port }}
+  rules:
+    - hosts:
+        - {{ .Values.ingress.host }}
+  scalingMetric:
+    requestRate:
+      targetValue: {{ .Values.keda.requestRateTargetValue }}
+      window: {{ .Values.keda.requestRateWindow }}
+      granularity: {{ .Values.keda.requestRateGranularity }}
+
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  scaleTargetRef:
+    name: {{ .Release.Name }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  triggers:
+    - type: external-push
+      metadata:
+        scalerAddress: {{ .Values.keda.externalScalerAddress }}
+        interceptorRoute: {{ .Release.Name }}
+
+---
+# cert-manager's ingress-shim only watches core Ingress/Gateway API, not
+# Traefik's IngressRoute CRD, so the cert has to be requested explicitly
+# here instead of via a cert-manager.io/cluster-issuer annotation.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.ingress.tls.secretName }}
+spec:
+  secretName: {{ .Values.ingress.tls.secretName }}
+  dnsNames:
+    - {{ .Values.ingress.host }}
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ .Values.ingress.clusterIssuer }}
+
+---
+# Routes directly to the interceptor-proxy Service in the shared `keda`
+# namespace. Requires providers.kubernetesCRD.allowCrossNamespace=true on
+# the cluster's Traefik (see pumpking/manifests/traefik-helmchartconfig.yaml)
+# -- a plain core Ingress can't do this at all (ExternalName Service
+# backends are blocked, and Ingress has no cross-namespace service ref).
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ .Release.Name }}
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`{{ .Values.ingress.host }}`)
+      middlewares:
+        - name: redirect-https
+          namespace: {{ .Release.Namespace }}
+      services:
+        - name: {{ .Values.keda.interceptorProxyService }}
+          namespace: {{ .Values.keda.namespace }}
+          port: {{ .Values.keda.interceptorProxyPort }}
+  tls:
+    secretName: {{ .Values.ingress.tls.secretName }}
+{{- end }}

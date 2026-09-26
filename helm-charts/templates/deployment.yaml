@@ -6,7 +6,9 @@ metadata:
     app.kubernetes.io/name: "{{ .Release.Name }}-web"
     app.kubernetes.io/instance: {{ .Release.Name }}
 spec:
+  {{- if not .Values.keda.enabled }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -264,6 +266,7 @@ spec:
     targetPort: http
   type: ClusterIP
 
+{{- if not .Values.keda.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -302,3 +305,4 @@ spec:
             name: {{ .Release.Name }}-service
             port:
               number: 80
+{{- end }}

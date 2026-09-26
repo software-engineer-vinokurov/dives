@@ -1317,3 +1317,17 @@ this repo's `checks` job to run inside `mcr.microsoft.com/playwright:v1.62.1-nob
 "Install Playwright browser" step entirely -- that image ships Node 24.x,
 WebKit, and the OS deps already baked in. Verified the resulting YAML with
 js-yaml; did not trigger an actual CI run for this repo in this session.
+
+## 2026-09-26 23:35 CEST — Add KEDA scale-to-zero (issue #29)
+
+> /autopilot work on https://gitea.pumpking.aleksandr.vin/software-engineer-vinokurov/dives/issues/29 in ../dives repo
+
+Sibling of `luglab#14` (same idle-scale-down request, three repos cross-referencing each other) — the cluster-wide platform work (KEDA + KEDA HTTP Add-on install, Traefik `allowCrossNamespace`) was already done during that session (see `pumpking/changelog/2026-09-26-install-keda-http-add-on.md`), so this pass was just replicating the per-app Helm pattern here.
+
+Confirmed first that `dives`' two `CronJob`s (`notification-worker` every 2min, `padi-token-refresh` every 30min) are separate resources from the web `Deployment` — scaling the web app to 0 doesn't touch either, consistent with the issue's "no background services" framing (the actual periodic work already lives outside the Deployment). Added `helm-charts/templates/keda.yaml` (`InterceptorRoute` + `ScaledObject` + Traefik `IngressRoute` + standalone `Certificate`, gated on new `keda.enabled` value, default `false`) and made `templates/deployment.yaml`'s core `Ingress` conditional on `not .Values.keda.enabled` + omitted `spec.replicas` when true — identical shape to `luglab`'s, verified with `helm lint`/`helm template` in both states.
+
+Unlike `luglab`, `dives` is a live app with real traffic (89 prior helm revisions) — flagged to the user before deleting the live `Ingress`/`Certificate` (same ownership-conflict issue as `luglab` hit: Helm refuses to adopt a `Certificate` already owned by the old `Ingress`), since doing so opens a real, if brief, window with no route for actual users. User confirmed proceeding. Deleted `dives-ingress` + `dives-aleksandr-vin-tls` and ran `helm upgrade` immediately after in the same breath; the pre-flight ownership check (that had already saved `luglab` from any partial damage) meant the very first attempt was fully a no-op against the live Ingress until confirmed. Certificate reissued near-instantly, deployed clean as revision 90.
+
+Verified end-to-end: `ScaledObject` went `ACTIVE=False`/0 replicas within under a minute idle; first request after that returned `307` (the app's normal auth/locale redirect, not an error) in ~11.5s, including both the `app` and `suunto-sidecar` containers coming up (Pod `Ready` gates on both containers' readiness probes) plus the migration/backfills init containers; warm request ~0.1s.
+
+Unlike `luglab`, `dives`' `HEALTHCHECK_PING_URL` isn't actually set in the live `dev-values.yaml` (healthchecks.io integration was skipped for this project already) — so the scale-to-zero-vs-dead-man's-switch conflict doesn't currently apply here; documented in the new `docs/deployment.md` as a "revisit if this is ever enabled" note rather than an active tradeoff. Same `DEV_VALUES_YAML` Gitea secret gap as `luglab`: added `keda:\n  enabled: true` to the local git-ignored `dev-values.yaml` for consistency, but the actual CI-deploy secret needs the same manual update or the next push-to-main will revert this.

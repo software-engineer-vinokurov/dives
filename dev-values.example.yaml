@@ -1,6 +1,13 @@
 ingress:
   clusterIssuer: "letsencrypt-prod"
 
+# Scale to 0 when idle, waking on the first HTTP request -- see
+# docs/deployment.md. Requires KEDA + KEDA HTTP Add-on already installed
+# cluster-wide. Only scales the web Deployment; the notification-worker and
+# padi-token-refresh CronJobs are unaffected either way.
+keda:
+  enabled: true
+
 env:
   # No custom Authentik brand -- pumpking's shared default host, application
   # slug == the project name.
