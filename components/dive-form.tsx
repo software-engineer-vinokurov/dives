@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { createDiveAction, recentCylindersAction, updateDiveAction } from "@/app/actions/dives";
 import { createSuuntoDiveImportAction, mergeSuuntoDiveImportAction } from "@/app/actions/suunto";
+import { createGarminDiveImportAction, mergeGarminDiveImportAction } from "@/app/actions/garmin";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DepthProfileField } from "@/components/depth-profile-field";
 import {
@@ -111,7 +112,7 @@ type SuuntoMergeCandidateValues = FormState & {
   depthProfile: unknown;
 };
 
-export type SuuntoMergeCandidate = {
+export type MergeCandidate = {
   id: number;
   title: string | null;
   occurredAt: string;
@@ -467,7 +468,7 @@ function formatCylinderOption(option: RecentCylinder): string {
   return [option.tankInfo, size].filter(Boolean).join(" · ") || "—";
 }
 
-function formatCandidate(candidate: SuuntoMergeCandidate): string {
+function formatCandidate(candidate: MergeCandidate): string {
   const date = new Date(candidate.occurredAt);
   const when = Number.isFinite(date.getTime()) ? date.toLocaleString() : candidate.occurredAt;
   const details = [
@@ -612,13 +613,17 @@ export function DiveForm({
   draftDive,
   suuntoImportId,
   suuntoMergeCandidates = [],
+  garminImportId,
+  garminMergeCandidates = [],
   cancelHref,
   submitLabel,
 }: {
   dive?: DiveRecord;
   draftDive?: Partial<DiveInput>;
   suuntoImportId?: number;
-  suuntoMergeCandidates?: SuuntoMergeCandidate[];
+  suuntoMergeCandidates?: MergeCandidate[];
+  garminImportId?: number;
+  garminMergeCandidates?: MergeCandidate[];
   cancelHref?: string;
   submitLabel?: string;
 }) {
@@ -629,13 +634,15 @@ export function DiveForm({
   );
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeStep, setMergeStep] = useState<"target" | "fields">("target");
-  const [mergeTargetId, setMergeTargetId] = useState<number | null>(suuntoMergeCandidates[0]?.id ?? null);
+  const initialMergeTargetId = suuntoImportId !== undefined ? suuntoMergeCandidates[0]?.id : garminImportId !== undefined ? garminMergeCandidates[0]?.id : null;
+  const [mergeTargetId, setMergeTargetId] = useState<number | null>(initialMergeTargetId ?? null);
+  const activeMergeCandidates = suuntoImportId !== undefined ? suuntoMergeCandidates : garminMergeCandidates;
   const [mergeChoices, setMergeChoices] = useState<Record<MergeFieldKey, MergeSource>>(() =>
     Object.fromEntries(mergeFields.map((field) => [field.key, "import"])) as Record<MergeFieldKey, MergeSource>,
   );
   const [isPending, startTransition] = useTransition();
   const neutralPlaceholder = (example: string) => (dive ? "--" : example);
-  const selectedMergeTarget = suuntoMergeCandidates.find((candidate) => candidate.id === mergeTargetId) ?? null;
+  const selectedMergeTarget = activeMergeCandidates.find((candidate) => candidate.id === mergeTargetId) ?? null;
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setState((previous) => ({ ...previous, [key]: value }));
@@ -733,6 +740,8 @@ export function DiveForm({
       const result =
         suuntoImportId !== undefined
           ? await createSuuntoDiveImportAction(suuntoImportId, input)
+          : garminImportId !== undefined
+            ? await createGarminDiveImportAction(garminImportId, input)
           : dive
             ? await updateDiveAction(dive.id, input)
             : await createDiveAction(input);
@@ -742,12 +751,16 @@ export function DiveForm({
         return;
       }
 
-      toast.success(suuntoImportId !== undefined ? "Suunto dive saved." : dive ? "Dive updated." : "Dive logged.");
+      toast.success(suuntoImportId !== undefined ? "Suunto dive saved." : garminImportId !== undefined ? "Garmin dive saved." : dive ? "Dive updated." : "Dive logged.");
       // refresh() must come BEFORE push(): it invalidates the client Router Cache, so the
       // navigation that follows is forced to fetch fresh data instead of serving a snapshot of
       // this route already cached from earlier in the session (push-then-refresh raced on this --
       // push could resolve from the stale cache before refresh got a chance to invalidate it).
       router.refresh();
+      if (garminImportId !== undefined && "nextImportId" in result && result.nextImportId !== null) {
+        router.push(`/settings/integrations/garmin/imports/${result.nextImportId}`);
+        return;
+      }
       if (suuntoImportId !== undefined && "nextImportId" in result && result.nextImportId !== null) {
         router.push(`/settings/integrations/suunto/imports/${result.nextImportId}`);
       } else {
@@ -757,10 +770,10 @@ export function DiveForm({
   }
 
   function mergeIntoExistingDive() {
-    if (suuntoImportId === undefined || mergeTargetId === null) return;
+    if ((suuntoImportId === undefined && garminImportId === undefined) || mergeTargetId === null) return;
     if (!validateProfile()) return;
 
-    const target = suuntoMergeCandidates.find((candidate) => candidate.id === mergeTargetId);
+    const target = activeMergeCandidates.find((candidate) => candidate.id === mergeTargetId);
     if (!target) return;
 
     const mergedState = mergeStates(state, target.values, mergeChoices);
@@ -770,7 +783,9 @@ export function DiveForm({
     );
 
     startTransition(async () => {
-      const result = await mergeSuuntoDiveImportAction(suuntoImportId, mergeTargetId, input);
+      const result = suuntoImportId !== undefined
+          ? await mergeSuuntoDiveImportAction(suuntoImportId, mergeTargetId, input)
+          : await mergeGarminDiveImportAction(garminImportId!, mergeTargetId!, input);
 
       if (!result.ok) {
         toast.error(result.error);
@@ -782,7 +797,11 @@ export function DiveForm({
       setMergeStep("target");
       router.refresh();
       if ("nextImportId" in result && result.nextImportId !== null) {
-        router.push(`/settings/integrations/suunto/imports/${result.nextImportId}`);
+        if (garminImportId !== undefined) {
+          router.push(`/settings/integrations/garmin/imports/${result.nextImportId}`);
+        } else {
+          router.push(`/settings/integrations/suunto/imports/${result.nextImportId}`);
+        }
       } else {
         router.push(`/dives/${result.id}`);
       }
@@ -1125,7 +1144,7 @@ export function DiveForm({
           {isPending ? <Loader2 className="animate-spin" /> : <Save />}
           {submitLabel ?? (dive ? "Save changes" : "Log dive")}
         </Button>
-        {suuntoImportId !== undefined && suuntoMergeCandidates.length > 0 ? (
+        {(suuntoImportId !== undefined || garminImportId !== undefined) && activeMergeCandidates.length > 0 ? (
           <Button
             type="button"
             variant="outline"
@@ -1168,11 +1187,11 @@ export function DiveForm({
               </DialogHeader>
 
               <div className="flex max-h-[30rem] flex-col gap-3 overflow-y-auto pr-1">
-                {suuntoMergeCandidates.map((candidate, index) => (
+                {activeMergeCandidates.map((candidate, index) => (
                   <label key={candidate.id} className="flex cursor-pointer gap-3 rounded-md border p-3 text-sm">
                     <input
                       type="radio"
-                      name="suunto-merge-target"
+                      name="import-merge-target"
                       checked={mergeTargetId === candidate.id}
                       onChange={() => setMergeTargetId(candidate.id)}
                       disabled={isPending}
@@ -1241,7 +1260,7 @@ export function DiveForm({
                         <label className="flex min-w-0 cursor-pointer items-center gap-2 text-sm">
                           <input
                             type="radio"
-                            name={`suunto-merge-${field.key}`}
+                            name={`import-merge-${field.key}`}
                             checked={mergeChoices[field.key] === "import"}
                             onChange={() => setMergeChoices((current) => ({ ...current, [field.key]: "import" }))}
                             disabled={isPending}
@@ -1251,7 +1270,7 @@ export function DiveForm({
                         <label className="flex min-w-0 cursor-pointer items-center gap-2 text-sm">
                           <input
                             type="radio"
-                            name={`suunto-merge-${field.key}`}
+                            name={`import-merge-${field.key}`}
                             checked={mergeChoices[field.key] === "target"}
                             onChange={() => setMergeChoices((current) => ({ ...current, [field.key]: "target" }))}
                             disabled={isPending}

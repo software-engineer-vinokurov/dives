@@ -104,6 +104,16 @@ notifications:
 padiTokenRefresh:
   schedule: "*/30 * * * *"
 
+garminSidecar:
+  # Disabled by default so stages without garmin-sidecar dependencies still deploy.
+  enabled: false
+  port: 4818
+  image:
+    repository: ""
+    pullPolicy: Always
+    tag: ""
+
+
 suuntoSidecar:
   # Disabled by default so stages without a suuntool-capable image still deploy.
   # When enabled, the app talks to this sidecar over 127.0.0.1 only.

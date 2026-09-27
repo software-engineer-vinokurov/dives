@@ -20,6 +20,7 @@ import { getPadiIntegrationStatus } from "@/lib/padi/integrations";
 import { average, diveSacRate, percentile } from "@/lib/sac-rate";
 import { requireUser } from "@/lib/session";
 import { getSuuntoIntegrationStatus } from "@/lib/suunto/integrations";
+import { getGarminIntegrationStatus } from "@/lib/garmin/integrations";
 import { buildTagCloud, effectiveTags, MISSING_PADI_TAG, MISSING_SUUNTO_TAG } from "@/lib/tags";
 import { cn } from "@/lib/utils";
 
@@ -98,12 +99,13 @@ function Stat({
 export default async function DashboardPage() {
   const user = await requireUser("/dashboard");
   const earliestDive = await getEarliestDiveDate(user.id);
-  const [stats, dives, activity, padiIntegration, suuntoIntegration] = await Promise.all([
+  const [stats, dives, activity, padiIntegration, suuntoIntegration, garminIntegration] = await Promise.all([
     getDiveStats(user.id),
     listDives(user.id),
     getDiveActivityByDay(user.id, activityRange(earliestDive)),
     getPadiIntegrationStatus(user.id),
     getSuuntoIntegrationStatus(user.id),
+    getGarminIntegrationStatus(user.id),
   ]);
   const recent = dives.slice(0, 5);
   const radarStats = buildDiveRadarStats(dives);
@@ -126,6 +128,7 @@ export default async function DashboardPage() {
   const connections = {
     padiConnected: padiIntegration?.status === "connected",
     suuntoConnected: suuntoIntegration?.status === "connected",
+    garminConnected: garminIntegration?.status === "connected",
   };
   const tagCloud = buildTagCloud(dives, connections).slice(0, MAX_DASHBOARD_TAGS);
 

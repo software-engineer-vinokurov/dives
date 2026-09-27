@@ -26,7 +26,20 @@ project `dev-dives`.
 pnpm install
 docker-compose up -d postgres
 pnpm db:migrate
+
+# Start the main Next.js development server
 pnpm dev
+```
+
+To run the Garmin Connect integration sidecar locally (required for Garmin syncing):
+```sh
+# The sidecar has its own isolated dependencies that must be installed first
+cd scripts/garmin-sidecar
+npm install
+cd ../..
+
+# Run the sidecar in a separate terminal
+pnpm garmin:sidecar
 ```
 
 See [`docs/development.md`](docs/development.md) for the full local setup,
@@ -47,6 +60,7 @@ this repo.
 | `pnpm db:migrate` | Apply `migrations/*.sql` |
 | `pnpm notifications:process` | Drain the notification queue once |
 | `pnpm suunto:sidecar` | Run the local pod-style suuntool sidecar wrapper |
+| `pnpm garmin:sidecar` | Run the local Node.js Garmin Connect sidecar |
 
 This repo was scaffolded from the upstream 21daylabs Next.js template; see
 "Project identity" in `AGENTS.md` for what was and wasn't carried over.

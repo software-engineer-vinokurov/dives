@@ -56,6 +56,8 @@ function makeDive(overrides: Partial<DiveRecord>): DiveRecord {
     padi_last_compared_at: null,
     suunto_workout_key: null,
     suunto_profile: null,
+    garmin_activity_id: null,
+    garmin_profile: null,
     tags: [],
     site_name: null,
     site_location: null,

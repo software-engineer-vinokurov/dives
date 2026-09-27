@@ -166,6 +166,9 @@ importers:
 
   .:
     dependencies:
+      '@garmin/fitsdk':
+        specifier: ^21.217.0
+        version: 21.217.0
       '@opentelemetry/api':
         specifier: ^1.9.1
         version: 1.9.1
@@ -617,6 +620,9 @@ packages:
 
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
+
+  '@garmin/fitsdk@21.217.0':
+    resolution: {integrity: sha512-oIkDo28Yrv8ZhJiOTBZWn8Cb9kIkcAx7oVfNtgqRuNvzbCyFWdLg1StUVECjIo9rbtpvTDuW8Jqd3PTnVapiAw==}
 
   '@grpc/grpc-js@1.14.4':
     resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
@@ -5346,6 +5352,8 @@ snapshots:
       react-dom: 19.3.0(react@19.3.0)
 
   '@floating-ui/utils@0.2.12': {}
+
+  '@garmin/fitsdk@21.217.0': {}
 
   '@grpc/grpc-js@1.14.4':
     dependencies:

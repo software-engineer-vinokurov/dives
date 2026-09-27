@@ -1355,3 +1355,35 @@ Follow-up to the same session's WebSocket feature: revision 93's deploy left `ws
 Fixed in the `Dockerfile`'s runner stage with a targeted `npm install --no-save --omit=dev ws@^8.21.3` (verified `ws` has zero required runtime deps, so no transitive-dependency risk) -- done in an isolated `/tmp` directory rather than `/app` directly, since running `npm install` against the minimal `package.json` the standalone output places there trips an unrelated npm bug (`Cannot read properties of null (reading 'matches')`). Copying the `ws` folder straight from the earlier `deps` build stage wasn't an option either: pnpm's `node_modules` is a tree of symlinks into its content-addressed store, which a plain `COPY` doesn't dereference into something that exists in the final image.
 
 Verified locally before pushing again (`docker build` + `docker run` the actual sidecar entrypoint) rather than relying on another CI round-trip blind -- confirmed clean `ws-sidecar listening` startup with no module error. After the real deploy (revision 94) landed: all 3 containers `Running`/`ready=true`, cold request after scale-to-zero back to the expected ~11.7s (matching pre-ws-sidecar baseline), and confirmed via `kubectl` that both `InterceptorRoute`s (`dives` on `requestRate`, `dives-ws` on `concurrency`) and both `ScaledObject` triggers are live. Manually probed `/ws` over forced HTTP/1.1 (curl defaults to HTTP/2 against this endpoint, which silently ignores `Upgrade` headers instead of erroring -- a red herring on the first attempt) without a session cookie: got a `502` from the interceptor, consistent with the sidecar's auth code path (`socket.destroy()` on no valid session) rather than a bug -- confirms the route reaches the sidecar and rejects unauthenticated upgrades, though a bare `destroy()` producing a generic 502 rather than a clean 401 is a minor polish gap, not a security one (nothing on the real client path ever calls this while logged out). Did not verify the full authenticated happy path (two real browser sessions, one triggering a change the other live-refreshes) -- needs a real Authentik login, which isn't something to script against production from here.
+## 2026-09-10 09:50 — Garmin dive sync integration planning
+
+> OK we are at the beautiful project named dives. Please review the project, read all the documentation and skills and provide me short summary, than create garmin-sync branch and shall we start planning to write module that will be doing the same what it does for suunto but for Garmin (dive watches and computers) dive synchronizations.
+
+## 2026-09-10 11:20 — Garmin plan open questions answers
+
+> answering questions here:
+> 1. for session it is option A but!!! I think we need to figure out the session TTL in this case otherwise how will you go and manage this?
+> 2. A definitely, but if we are in a pod... it is not persistent right? How is the suunto stores the data in this case?
+> 3. It is C as we are talking about garmin dive I guess and we need to filter apnea from gas diving. Figure out of how to do this.
+> 4. It is B only. We do not support something that is not a diving computer.
+
+## 2026-09-25 14:00 — Garmin Integration UI & Parser Fixes
+
+> I cleaned up all the dives but I'd like also to see this button once garmin is logged in necxt to the suunto should be something like 'garmin sync' OK?
+
+> what the fuck with parser:
+> Image #1 this app
+> image #2 garmin connect :( 
+> like... are you kidding me?Q!
+
+> do we need those docker exec commands still running?
+
+> OK, skip it this one was too short. The next one:
+> but also the temperature:
+> it seems like I have this parameters, why they are parsed wrongly?
+
+> what shold I do, to reupload the dive or re-check?
+
+> все клас, тепер давай оновим останнє, треба величини як глибина, середня глибина, окрім широти та довготи і позиції (site location), округлити до 2 цифр після коми, і будьласка
+
+> OK! Now!!! It is time to review the documentation and update requirements in all related to the changes were implemented during this session.

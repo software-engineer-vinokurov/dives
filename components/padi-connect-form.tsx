@@ -140,7 +140,7 @@ export function PadiConnectForm({ status }: { status: PadiConnectStatus }) {
       <p className="text-xs text-muted-foreground">
         Your password is used once to sign in to PADI and is never stored.
       </p>
-      <Button type="submit" disabled={isPending || !username || !password} className="w-fit">
+      <Button type="submit" disabled={isPending} className="w-fit">
         {isPending ? <Loader2 className="animate-spin" /> : null}
         {status ? "Reconnect PADI" : "Connect PADI"}
       </Button>
