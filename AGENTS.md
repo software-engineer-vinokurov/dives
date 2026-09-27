@@ -122,6 +122,16 @@ keep growing rather than committing real secrets or machine-specific paths:
   placeholder values so the required keys stay discoverable. `.env` /
   `.env.example` follows the same pattern.
 
+CI (`.gitea/workflows/ci.yml`) deploys using the `DEV_VALUES_YAML` Gitea
+Actions secret (the whole `dev-values.yaml`, base64-encoded), not the local
+git-ignored file directly — editing the local file alone has no effect on
+CI deploys. After changing `dev-values.yaml`, run `just
+update-dev-values-secret` to push the update (base64-encodes the current
+file and sets the secret via `tea actions secrets set --stdin
+DEV_VALUES_YAML`). Skipping this step means the next push-to-main silently
+redeploys with the old values, reverting whatever the local file's change
+was meant to do.
+
 General rule for any new local file an agent creates: if it contains a real
 secret, credential, absolute machine path, or other value specific to one
 deployment or one developer's machine, it must not be committed. Add it to
