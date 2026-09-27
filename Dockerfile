@@ -52,6 +52,24 @@ COPY --from=builder --chown=nextjs:nodejs /app/migrations ./migrations
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=suuntool-builder /out/suuntool /usr/local/bin/suuntool
 
+# `output: "standalone"` only traces node_modules actually reachable from the
+# Next.js app's own bundle -- pg (used by scripts/*.mjs too) rides along for
+# free because lib/db.ts already pulls it in for the app itself, but `ws`
+# (scripts/ws-sidecar/server.mjs only, nothing in the app imports it) isn't
+# reachable that way and gets pruned. Installed directly rather than copied
+# from the deps stage: pnpm's node_modules there is a tree of symlinks into
+# its content-addressed store, which a plain `COPY` doesn't dereference into
+# something that exists in this image. `ws` has zero required runtime
+# dependencies, so a plain npm install is simple and safe here -- done in an
+# isolated directory rather than /app directly, since npm install trips a
+# "Cannot read properties of null (reading 'matches')" error when run
+# against the minimal package.json the standalone output just placed there.
+RUN mkdir /tmp/ws-install \
+  && cd /tmp/ws-install \
+  && npm install --no-save --omit=dev ws@^8.21.3 \
+  && cp -r /tmp/ws-install/node_modules/ws /app/node_modules/ws \
+  && rm -rf /tmp/ws-install
+
 USER nextjs
 
 EXPOSE 3000
