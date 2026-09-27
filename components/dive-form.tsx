@@ -637,6 +637,7 @@ export function DiveForm({
   const initialMergeTargetId = suuntoImportId !== undefined ? suuntoMergeCandidates[0]?.id : garminImportId !== undefined ? garminMergeCandidates[0]?.id : null;
   const [mergeTargetId, setMergeTargetId] = useState<number | null>(initialMergeTargetId ?? null);
   const activeMergeCandidates = suuntoImportId !== undefined ? suuntoMergeCandidates : garminMergeCandidates;
+  const mergeSourceLabel = suuntoImportId !== undefined ? "Suunto" : "Garmin";
   const [mergeChoices, setMergeChoices] = useState<Record<MergeFieldKey, MergeSource>>(() =>
     Object.fromEntries(mergeFields.map((field) => [field.key, "import"])) as Record<MergeFieldKey, MergeSource>,
   );
@@ -792,7 +793,7 @@ export function DiveForm({
         return;
       }
 
-      toast.success("Suunto dive merged into existing dive.");
+      toast.success(`${mergeSourceLabel} dive merged into existing dive.`);
       setMergeOpen(false);
       setMergeStep("target");
       router.refresh();
@@ -1180,7 +1181,7 @@ export function DiveForm({
           {mergeStep === "target" ? (
             <>
               <DialogHeader>
-                <DialogTitle>Merge Suunto import into existing dive</DialogTitle>
+                <DialogTitle>Merge {mergeSourceLabel} import into existing dive</DialogTitle>
                 <DialogDescription>
                   Pick the existing dive to update. You will choose which fields survive on the next step.
                 </DialogDescription>
@@ -1230,8 +1231,10 @@ export function DiveForm({
               <DialogHeader>
                 <DialogTitle>Choose surviving fields</DialogTitle>
                 <DialogDescription>
-                  For each property, choose whether the reviewed Suunto import or the existing dive value should be
-                  kept. The Suunto workout id, chart data, and original bundle will be attached to the selected dive.
+                  For each property, choose whether the reviewed {mergeSourceLabel} import or the existing dive value
+                  should be kept. The {mergeSourceLabel} {suuntoImportId !== undefined ? "workout id" : "activity id"},
+                  chart data, and original {suuntoImportId !== undefined ? "bundle" : "FIT file"} will be attached to
+                  the selected dive.
                 </DialogDescription>
               </DialogHeader>
 
@@ -1248,7 +1251,7 @@ export function DiveForm({
                   <div className="rounded-md border">
                     <div className="grid grid-cols-[8rem_1fr_1fr] border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
                       <span>Property</span>
-                      <span>Reviewed Suunto import</span>
+                      <span>Reviewed {mergeSourceLabel} import</span>
                       <span>Existing dive</span>
                     </div>
                     {mergeFields.map((field) => (
