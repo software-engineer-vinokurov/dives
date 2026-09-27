@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Waves } from "lucide-react";
 
 import { FeedbackButton } from "@/components/feedback-button";
+import { LiveDiveUpdates } from "@/components/live-dive-updates";
 import { LogoutButton } from "@/components/logout-button";
 import { ManageMenu } from "@/components/manage-menu";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -26,6 +27,7 @@ export function AppShell({
 }) {
   return (
     <div className="relative z-10 flex min-h-svh flex-col">
+      <LiveDiveUpdates />
       <header className="border-b border-border/80 bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-3">
           <Link

@@ -10,11 +10,48 @@ spec:
   rules:
     - hosts:
         - {{ .Values.ingress.host }}
+      # Explicit, so the /ws-scoped InterceptorRoute below always wins on
+      # its own path regardless of matching order -- not strictly required
+      # (longest-prefix-wins already resolves this), but avoids relying on
+      # that being implicit.
+      paths:
+        - value: /
   scalingMetric:
     requestRate:
       targetValue: {{ .Values.keda.requestRateTargetValue }}
       window: {{ .Values.keda.requestRateWindow }}
       granularity: {{ .Values.keda.requestRateGranularity }}
+
+{{- if .Values.wsSidecar.enabled }}
+---
+# Routed through the SAME shared interceptor as the main app (the
+# IngressRoute below sends every path for this host to the interceptor
+# already) -- the interceptor picks this route over the main one for /ws
+# based on path match, then proxies the upgraded WebSocket connection
+# straight through to ws-service. scalingMetric.concurrency (not
+# requestRate) means a single still-open connection alone keeps this
+# InterceptorRoute's contribution to the ScaledObject non-zero for as long
+# as it stays connected -- KEDA_HTTP_REQUEST_TIMEOUT defaults to 0
+# (unlimited) cluster-wide, and the interceptor's own docs treat WebSocket
+# connections as tracked in-flight requests through graceful-shutdown
+# draining, so this is supported, not an abuse of the mechanism.
+apiVersion: http.keda.sh/v1beta1
+kind: InterceptorRoute
+metadata:
+  name: {{ .Release.Name }}-ws
+spec:
+  target:
+    service: {{ .Release.Name }}-ws-service
+    port: {{ .Values.wsSidecar.port }}
+  rules:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      paths:
+        - value: /ws
+  scalingMetric:
+    concurrency:
+      targetValue: 1
+{{- end }}
 
 ---
 apiVersion: keda.sh/v1alpha1
@@ -32,6 +69,12 @@ spec:
       metadata:
         scalerAddress: {{ .Values.keda.externalScalerAddress }}
         interceptorRoute: {{ .Release.Name }}
+    {{- if .Values.wsSidecar.enabled }}
+    - type: external-push
+      metadata:
+        scalerAddress: {{ .Values.keda.externalScalerAddress }}
+        interceptorRoute: {{ .Release.Name }}-ws
+    {{- end }}
 
 ---
 # cert-manager's ingress-shim only watches core Ingress/Gateway API, not

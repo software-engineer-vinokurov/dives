@@ -232,6 +232,55 @@ spec:
           resources:
             {{- toYaml .Values.suuntoSidecar.resources | nindent 12 }}
         {{- end }}
+        {{- if .Values.wsSidecar.enabled }}
+        - name: ws-sidecar
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node"]
+          args: ["scripts/ws-sidecar/server.mjs"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: WS_SIDECAR_PORT
+              value: {{ .Values.wsSidecar.port | quote }}
+            - name: WS_SIDECAR_POLL_INTERVAL_MS
+              value: {{ .Values.wsSidecar.pollIntervalMs | quote }}
+            - name: DATABASE_URL
+              value: {{ .Values.env.DATABASE_URL | quote }}
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseApp.secretName is required" .Values.databaseApp.secretName | quote }}
+                  key: {{ .Values.databaseApp.usernameKey | quote }}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseApp.secretName is required" .Values.databaseApp.secretName | quote }}
+                  key: {{ .Values.databaseApp.passwordKey | quote }}
+          ports:
+            - name: ws
+              containerPort: {{ .Values.wsSidecar.port }}
+          livenessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.wsSidecar.port }}/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:{{ .Values.wsSidecar.port }}/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.wsSidecar.resources | nindent 12 }}
+        {{- end }}
       volumes:
         - name: configs
           configMap:
@@ -264,6 +313,22 @@ spec:
   - protocol: TCP
     port: 80
     targetPort: http
+
+{{- if .Values.wsSidecar.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-ws-service
+spec:
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-web
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+  - protocol: TCP
+    port: {{ .Values.wsSidecar.port }}
+    targetPort: ws
+{{- end }}
   type: ClusterIP
 
 {{- if not .Values.keda.enabled }}

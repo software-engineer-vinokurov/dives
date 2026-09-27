@@ -133,6 +133,26 @@ suuntoSidecar:
       cpu: "500m"
       memory: "512Mi"
 
+# Pushes a "dives changed" event to every open browser tab/device signed
+# into the same account (e.g. a PADI/Suunto background sync completing, or
+# the same account open on two devices), so they can router.refresh()
+# instead of the user needing to reload. Uses the SAME app image, just a
+# different entrypoint (scripts/ws-sidecar/server.mjs) -- see
+# docs/deployment.md. Unlike suuntoSidecar, this binds all interfaces:
+# it's reached cross-pod via wsService, not just from the app container in
+# the same pod.
+wsSidecar:
+  enabled: true
+  port: 4818
+  pollIntervalMs: "5000"
+  resources:
+    requests:
+      cpu: "25m"
+      memory: "64Mi"
+    limits:
+      cpu: "250m"
+      memory: "128Mi"
+
 appSecrets:
   email_host_password: "replace-with-email-host-password"
   DIVES_ADMIN_PASSWORD: "replace-with-admin-password"
