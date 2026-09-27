@@ -26,4 +26,6 @@ padi-log-backup*.json
 suuntoexp/
 
 .omx/
+.omx-state-locks/
+.omx-state-locks.identity.json
 .pnpm-store/

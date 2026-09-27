@@ -104,7 +104,7 @@ async function callSidecar<T>(path: string, body?: unknown, timeoutMs = 60_000):
 }
 
 export async function garminLogin(email: string, password: string): Promise<GarminLoginResponse> {
-  const payload = await callSidecar<{ oauth1: any; oauth2: any }>("/login", { email, password });
+  const payload = await callSidecar<{ oauth1: unknown; oauth2: unknown }>("/login", { email, password });
   return { sessionJson: JSON.stringify({ oauth1: payload.oauth1, oauth2: payload.oauth2 }) };
 }
 
@@ -116,7 +116,7 @@ async function callWithSession<T>(
   timeoutMs = 60_000
 ): Promise<T> {
   const session = JSON.parse(sessionJson);
-  const result = await callSidecar<T & { updatedOauth1?: any; updatedOauth2?: any }>(
+  const result = await callSidecar<T & { updatedOauth1?: unknown; updatedOauth2?: unknown }>(
     path,
     { ...body, oauth1: session.oauth1, oauth2: session.oauth2 },
     timeoutMs

@@ -3,7 +3,6 @@ import "server-only";
 import type { DepthPoint } from "@/lib/depth-profile";
 import type { DiveInput } from "@/lib/dives";
 import { isDescentDevice } from "./descent-devices";
-import { ataAtDepth } from "@/lib/gas-consumption";
 
 export type GarminDiveProfilePoint = {
   time: number; // Offset from start in seconds
@@ -41,6 +40,36 @@ export type GarminProfileCompileResult =
   | { ok: true; profile: GarminDiveProfile; draftDive: Partial<DiveInput> }
   | { ok: false; error: string; reason?: "not_a_dive" | "not_descent" };
 
+// Only fields consumed here are constrained; the original session remains the summary.
+// Enum fields may be numeric or string-valued depending on FIT decoder options.
+type GarminFitMessages = {
+  sessionMesgs?: {
+    subSport?: number | string;
+    startTime?: Date | number | string;
+    totalTimerTime?: number | null;
+    maxDepth?: number | null;
+    avgDepth?: number | null;
+    startPositionLat?: number | null;
+    startPositionLong?: number | null;
+    minTemperature?: number | null;
+  }[];
+  deviceInfoMesgs?: {
+    manufacturer?: number | string;
+    product?: number;
+    garminProduct?: number | string;
+  }[];
+  recordMesgs?: {
+    timestamp?: Date | number | string;
+    depth?: number | null;
+    temperature?: number | null;
+  }[];
+  // `surfaceTemperature` isn't part of the FIT SDK's declared DiveSettingsMesg shape (pre-existing
+  // behavior, always undefined via the real decoder) -- kept opaque here and narrowed with a local
+  // cast at the read site instead of misdescribing the SDK's actual message shape.
+  diveSettingsMesgs?: unknown[];
+  diveGasMesgs?: { oxygenContent?: number | null }[];
+};
+
 // Sub sport enum for diving
 const SUB_SPORT_APNEA_DIVING = 37;
 const SUB_SPORT_APNEA_HUNT = 43;
@@ -74,7 +103,7 @@ function draftDiveFromGarminProfile(profile: GarminDiveProfile): Partial<DiveInp
 
 export function compileGarminProfile(
   activityId: string,
-  fitMessages: any,
+  fitMessages: GarminFitMessages,
 ): GarminProfileCompileResult {
   const sessionMsg = fitMessages.sessionMesgs?.[0];
   if (!sessionMsg) {
@@ -92,9 +121,9 @@ export function compileGarminProfile(
   let isDescent = false;
   for (const info of deviceInfoMsgs) {
     if (isDescentDevice({
-      manufacturer: info.manufacturer,
+      manufacturer: typeof info.manufacturer === "number" ? info.manufacturer : undefined,
       product: info.product,
-      garminProduct: info.garminProduct,
+      garminProduct: typeof info.garminProduct === "number" ? info.garminProduct : undefined,
     })) {
       isDescent = true;
       break;
@@ -105,7 +134,7 @@ export function compileGarminProfile(
     console.warn("Activity is from a Garmin device not strictly in the Descent list, but importing anyway.");
   }
 
-  const diveSettingsMsg = fitMessages.diveSettingsMesgs?.[0];
+  const diveSettingsMsg = fitMessages.diveSettingsMesgs?.[0] as { surfaceTemperature?: number | null } | undefined;
   function parseGarminTimestamp(ts: unknown): number | null {
     if (ts instanceof Date) return ts.getTime();
     if (typeof ts === "number") return ts * 1000 + 631065600000;

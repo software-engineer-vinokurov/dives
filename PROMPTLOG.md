@@ -1387,3 +1387,26 @@ Verified locally before pushing again (`docker build` + `docker run` the actual 
 > все клас, тепер давай оновим останнє, треба величини як глибина, середня глибина, окрім широти та довготи і позиції (site location), округлити до 2 цифр після коми, і будьласка
 
 > OK! Now!!! It is time to review the documentation and update requirements in all related to the changes were implemented during this session.
+
+## 2026-09-27 16:21 CEST — Fix CI run 1177
+
+> $oh-my-codex:autopilot please check why CI fails https://gitea.pumpking.aleksandr.vin/software-engineer-vinokurov/dives/actions/runs/1177 and fix the issues
+
+## 2026-09-27 16:30 CEST — Use tea CLI
+
+> use tea cli
+> what are you waiting?
+
+## 2026-09-27 20:00 CEST — Continue fixing CI run 1177 (issue #57)
+
+> /autopilot please continue the last session of omx -- he was fixing the CI problems on the last commit of the main branch.
+
+Continued the prior session's in-progress fix on `garmin-fixes` (issue #57, CI run 1177's lint failure). The five lint-affected files already had their explicit-`any`s replaced with `unknown`/structural types and the corresponding unit tests extended; `lib/session.ts` (3 unused catch bindings) and `scripts/garmin-sidecar/server.mjs` (1) still needed the same treatment — done, `pnpm lint` now exits clean with zero warnings.
+
+`pnpm typecheck` then caught a real gap the prior pass missed: `compileGarminProfile`'s new `GarminFitMessages` type declared `diveSettingsMesgs?: { surfaceTemperature?: number | null }[]`, but the installed `@garmin/fitsdk` `DiveSettingsMesg` has no `surfaceTemperature` field at all — TS's weak-type check correctly rejected the real `FitMessages` argument at the one call site (`app/actions/garmin.ts`). Confirmed via `grep` that the field is absent from the SDK's declarations entirely, i.e. `diveSettingsMsg?.surfaceTemperature` has always evaluated to `undefined` through the real decoder (pre-existing dead-ish fallback to `temps[0]`) — not something this pass should "fix" by inventing a field the SDK doesn't have. Left `diveSettingsMesgs` as `unknown[]` and narrowed with a local cast at the one read site instead.
+
+Full checks-job-equivalent ladder run locally: `pnpm lint`, `pnpm typecheck && pnpm test:unit` (204/204), `pnpm db:migrate` + `pnpm test:pg` (128/128, against a throwaway local `dives-postgres-local` container on port 5434 to avoid an unrelated ssh tunnel already holding 5432 on this machine), `pnpm build`, all clean. `pnpm test:e2e --project=webkit` had 6 failures (dive create/edit navigation timeouts, a disabled "Create dive site" button, one Garmin merge-dialog heading not found) — verified these are pre-existing local-environment issues, not a regression: `git stash` back to the unmodified `9813113` base commit reproduced the identical 6 failures with the identical error messages. `pnpm lint:unused` (knip) still reports its 4 pre-existing findings (`garmin-connect` unlisted dep, `GARMIN_MANUFACTURER_ID`/`redactGarminSecret`/`GarminSession` unused exports) — confirmed unchanged from the pre-fix baseline via the same stash comparison, out of scope for this lint-run repair and not part of CI's own job list anyway.
+
+Independent code-reviewer pass (separate context) approved the diff: confirmed the two new `typeof === "number"` guards in `profile.ts` are behavior-neutral (traced against `isDescentDevice`'s strict comparisons), confirmed the three `lib/session.ts` catch-binding removals and the one in `server.mjs` don't touch catch bodies or the `touchUserActivity` call, found no scope creep or secrets. Folded in its two actionable suggestions: added `.omx-state-locks/` and `.omx-state-locks.identity.json` (an orchestration tool's local, machine-specific state, not previously covered by any gitignore pattern) to `.gitignore`, and added a `console.warn` assertion to the one existing test that supplies a genuinely-matching Descent device id, so a regression in the new `typeof` guards would actually fail a test instead of passing silently. Left two other review notes (a pre-existing wrong device-id comment in older tests, and `subSport`'s string/number enum hazard) as follow-up material rather than in-scope edits.
+
+Updated `docs/development.md` with a short "Typing at the Garmin boundaries" note explaining the `unknown`-for-opaque-OAuth / structural-types-for-consumed-FIT-fields split and the `diveSettingsMesgs` SDK gap. Issue #57 left open for review, per AGENTS.md.

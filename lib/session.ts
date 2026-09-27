@@ -87,7 +87,7 @@ export async function deleteSession(): Promise<{ idToken: string | null; user: A
     }
   }
 
-  try { cookieStore.delete(cookieName); } catch (e) {}
+  try { cookieStore.delete(cookieName); } catch {}
   return { idToken, user };
 }
 
@@ -117,14 +117,14 @@ export async function getOptionalUser() {
   const userId = await findSessionUserId(hashSessionToken(token));
 
   if (!userId) {
-    try { cookieStore.delete(cookieName); } catch (e) {}
+    try { cookieStore.delete(cookieName); } catch {}
     return null;
   }
 
   const user = await findActiveUserById(userId);
 
   if (!user) {
-    try { await deleteSession(); } catch (e) {}
+    try { await deleteSession(); } catch {}
     return null;
   }
 

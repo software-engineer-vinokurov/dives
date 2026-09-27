@@ -13,12 +13,12 @@ export type GarminIntegrationStatus = {
 } | null;
 
 export type GarminSession = {
-  oauth1: any;
+  oauth1: unknown;
   oauth2: {
     access_token: string;
     refresh_token: string;
     expires_in: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 };
 
@@ -99,7 +99,7 @@ export async function saveGarminIntegration(
     if (session.oauth2?.expires_in) {
       tokenExpiresAt = new Date(Date.now() + session.oauth2.expires_in * 1000);
     }
-  } catch (err) {
+  } catch {
     // ignore parse error if any
   }
 
@@ -134,7 +134,7 @@ export async function updateGarminTokens(
     if (session.oauth2?.expires_in) {
       tokenExpiresAt = new Date(Date.now() + session.oauth2.expires_in * 1000);
     }
-  } catch (err) {
+  } catch {
     // ignore parse error if any
   }
 

@@ -20,7 +20,7 @@ async function body(req) {
   if (!raw.trim()) return {};
   try {
     return JSON.parse(raw);
-  } catch (error) {
+  } catch {
     const err = new Error("invalid json body");
     err.status = 400;
     err.reason = "bad_request";

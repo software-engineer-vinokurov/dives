@@ -1,7 +1,43 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { compileGarminProfile } from "../../lib/garmin/profile";
 
 describe("Garmin Profile Parser", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("reports a missing session", () => {
+    expect(compileGarminProfile("missing", {})).toEqual({ ok: false, error: "No session message found in FIT file" });
+  });
+
+  it.each([new Date("2026-09-25T10:00:00Z"), "2026-09-25T10:00:00Z", (Date.parse("2026-09-25T10:00:00Z") - 631065600000) / 1000])("preserves timestamp %s and extra summary fields with absent arrays", (startTime) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const session = { startTime, custom: { nested: [1, 2] } };
+    const result = compileGarminProfile("minimal", { sessionMesgs: [session] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.profile.startedAt).toBe("2026-09-25T10:00:00.000Z");
+    expect(result.profile.summary).toBe(session);
+    expect(result.profile.points).toEqual([]);
+    expect(warn).toHaveBeenCalledExactlyOnceWith("Activity is from a Garmin device not strictly in the Descent list, but importing anyway.");
+  });
+
+  it("preserves record timestamp fallback and zero/null semantics", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const result = compileGarminProfile("fallback", {
+      deviceInfoMesgs: [{ manufacturer: 1, product: 3542 }],
+      sessionMesgs: [{ totalTimerTime: 0, maxDepth: 0, avgDepth: 0, minTemperature: 24, startPositionLat: 0, startPositionLong: 10 }],
+      diveSettingsMesgs: [{ surfaceTemperature: 0 }],
+      diveGasMesgs: [{ oxygenContent: 0 }],
+      recordMesgs: [
+        { timestamp: "2026-09-25T10:00:00Z", depth: 0, temperature: 0 },
+        { timestamp: "2026-09-25T10:01:00Z", depth: 10, temperature: null },
+      ],
+    });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.profile).toMatchObject({ startedAt: null, durationMinutes: 1, maxDepth: 10, averageDepth: 5, waterTemperature: 0, waterTemperatureLow: 0, surfaceTemperature: 0, location: null, gasMix: null });
+    expect(result.profile.points.map(point => point.time)).toEqual([0, 60]);
+    expect(result.profile.points[1].temperature).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it("compiles a standard Descent dive accurately and rounds depths", () => {
     const mockFitMessages = {
       deviceInfoMesgs: [
@@ -95,10 +131,10 @@ describe("Garmin Profile Parser", () => {
     expect(result.profile.averageDepth).toBeNull();
   });
 
-  it("fails explicitly on apnea dives", () => {
+  it.each([37, 43])("fails explicitly on apnea enum %i", (subSport) => {
     const mockFitMessages = {
       deviceInfoMesgs: [{ manufacturer: 1, garminProduct: 3258 }],
-      sessionMesgs: [{ subSport: 37 }] // SUB_SPORT_APNEA_DIVING
+      sessionMesgs: [{ subSport }] // SUB_SPORT_APNEA_DIVING
     };
 
     const result = compileGarminProfile("test_apnea", mockFitMessages);
