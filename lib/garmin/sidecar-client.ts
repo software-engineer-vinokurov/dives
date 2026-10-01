@@ -51,7 +51,7 @@ export function redactGarminSecret(value: string): string {
 }
 
 function sidecarBaseUrl(): URL {
-  const raw = process.env.GARMIN_SIDECAR_URL ?? "http://127.0.0.1:4818";
+  const raw = process.env.GARMIN_SIDECAR_URL ?? "http://127.0.0.1:4819";
   const url = new URL(raw);
   if (url.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(url.hostname)) {
     throw new GarminSidecarError("GARMIN_SIDECAR_URL must be an http localhost URL.", "bad_request");

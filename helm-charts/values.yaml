@@ -107,7 +107,7 @@ padiTokenRefresh:
 garminSidecar:
   # Disabled by default so stages without garmin-sidecar dependencies still deploy.
   enabled: false
-  port: 4818
+  port: 4819
   image:
     repository: ""
     pullPolicy: Always

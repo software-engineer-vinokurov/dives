@@ -1444,3 +1444,11 @@ Fixed by deriving a `mergeSourceLabel` ("Suunto"/"Garmin") from `suuntoImportId`
 ## 2026-10-01 15:46 CEST — Commit Garmin sidecar port fix
 
 > commit
+
+## 2026-10-01 15:56 CEST — Move Garmin sidecar off WebSocket port
+
+> Damn, you used 4818 port which is ws-sidecar port -- please choose another one!
+
+## 2026-10-01 16:01 CEST — Commit Garmin port reassignment
+
+> сщььше

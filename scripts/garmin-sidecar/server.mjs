@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { GarminConnect } from "garmin-connect";
 
 const HOST = process.env.GARMIN_SIDECAR_HOST || "127.0.0.1";
-const PORT = Number(process.env.GARMIN_SIDECAR_PORT || 4818);
+const PORT = Number(process.env.GARMIN_SIDECAR_PORT || 4819);
 
 function json(res, status, body) {
   const payload = JSON.stringify(body);

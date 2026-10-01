@@ -785,7 +785,7 @@ cd ../..
 pnpm garmin:sidecar
 ```
 
-The sidecar will start on `http://127.0.0.1:4818`. The main Next.js app communicates with it automatically when interacting with Garmin Connect in the UI.
+The sidecar will start on `http://127.0.0.1:4819`. The main Next.js app communicates with it automatically when interacting with Garmin Connect in the UI.
 Override that dedicated listener with `GARMIN_SIDECAR_HOST` and
 `GARMIN_SIDECAR_PORT`; the generic `PORT` variable belongs to the Next.js
 server and is intentionally ignored by the sidecar.
@@ -798,7 +798,7 @@ dependencies beside `server.mjs` also avoids changing the application's traced
 
 ## Garmin staged imports
 
-Garmin integration mirrors the Suunto fetch-only architecture, utilizing a user-triggered sync. It relies on a local Node.js sidecar (`scripts/garmin-sidecar/server.mjs`) running on port 4818.
+Garmin integration mirrors the Suunto fetch-only architecture, utilizing a user-triggered sync. It relies on a local Node.js sidecar (`scripts/garmin-sidecar/server.mjs`) running on port 4819.
 - The sidecar leverages the `garmin-connect` library to handle OAuth negotiation and download raw activity data. The sidecar specifically downloads activities as ZIP archives containing `.fit` binary files.
 - The Next.js app receives these ZIP archives, unzips them natively (`lib/garmin/raw-fit.ts`), and extracts the underlying `.fit` file buffer. 
 - Garmin FIT binaries are decoded into messages via `@garmin/fitsdk`. The `compileGarminProfile` logic filters out Apnea/Free diving activities, checking that the device originates from the Descent family.

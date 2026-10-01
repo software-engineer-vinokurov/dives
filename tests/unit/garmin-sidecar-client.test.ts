@@ -87,7 +87,7 @@ describe("Garmin Sidecar Client", () => {
     expect(result.activities[0].activityId).toBe(123);
     
     expect(global.fetch).toHaveBeenCalledWith(
-      new URL("http://127.0.0.1:4818/activities/list"),
+      new URL("http://127.0.0.1:4819/activities/list"),
       expect.objectContaining({
         method: "POST",
         headers: { "content-type": "application/json" },
