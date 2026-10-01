@@ -786,6 +786,9 @@ pnpm garmin:sidecar
 ```
 
 The sidecar will start on `http://127.0.0.1:4818`. The main Next.js app communicates with it automatically when interacting with Garmin Connect in the UI.
+Override that dedicated listener with `GARMIN_SIDECAR_HOST` and
+`GARMIN_SIDECAR_PORT`; the generic `PORT` variable belongs to the Next.js
+server and is intentionally ignored by the sidecar.
 
 The production image installs `scripts/garmin-sidecar/package.json` separately
 inside the sidecar directory. Next.js standalone output tracing cannot include
