@@ -1420,3 +1420,15 @@ The lint-fix commit above reached `main` and, for the first time, let Gitea Acti
 Root cause: `components/dive-form.tsx`'s merge dialog (title, success toast, description, and the "Reviewed ... import" column header) had "Suunto" hardcoded in four places, unconditionally, regardless of whether the active import was Suunto or Garmin -- a pre-existing copy-paste gap from when Garmin merge support was added, invisible until now because CI never ran this spec before. Confirmed via local `git stash` to the unmodified base commit that this same failure already reproduced there, independent of this session's lint changes.
 
 Fixed by deriving a `mergeSourceLabel` ("Suunto"/"Garmin") from `suuntoImportId`, matching the pattern already used elsewhere in the same component for the create-toast/redirect logic, and using it in all four spots (plus source-appropriate "workout id"/"activity id" and "bundle"/"FIT file" wording in the description). Verified: `pnpm lint`/`pnpm typecheck` clean, `pnpm test:unit` 204/204, `pnpm build` clean, both `garmin-merge-preselect.spec.ts` and `suunto-merge-preselect.spec.ts` pass, and a full `pnpm test:e2e --project=webkit` run shows the Garmin failure gone (same 5 already-known local-only flaky tests remain, none of which the real CI run 1186 failed on).
+
+## 2026-10-01 14:52 CEST — Install garmin-connect for Garmin sidecar
+
+> Hey, garmin-sidecar fails to load "garmin-connect" package ("^1.6.0"), it is not referenced from th enextjs app itself so next build skip that dependency and we need to install it in Dockerfile build manually, please fix that
+
+## 2026-10-01 14:59 CEST — No existing Gitea issue
+
+> no
+
+## 2026-10-01 15:10 CEST — Commit Garmin sidecar Docker fix
+
+> commit

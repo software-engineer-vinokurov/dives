@@ -787,6 +787,12 @@ pnpm garmin:sidecar
 
 The sidecar will start on `http://127.0.0.1:4818`. The main Next.js app communicates with it automatically when interacting with Garmin Connect in the UI.
 
+The production image installs `scripts/garmin-sidecar/package.json` separately
+inside the sidecar directory. Next.js standalone output tracing cannot include
+`garmin-connect` because only the sidecar imports it; keeping its production
+dependencies beside `server.mjs` also avoids changing the application's traced
+`node_modules` tree.
+
 ## Garmin staged imports
 
 Garmin integration mirrors the Suunto fetch-only architecture, utilizing a user-triggered sync. It relies on a local Node.js sidecar (`scripts/garmin-sidecar/server.mjs`) running on port 4818.

@@ -52,6 +52,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/migrations ./migrations
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=suuntool-builder /out/suuntool /usr/local/bin/suuntool
 
+# The Garmin sidecar is not imported by the Next.js application, so standalone
+# output tracing does not include its garmin-connect dependency. Install the
+# sidecar's own production manifest in place; Node resolves it from the
+# server.mjs directory without changing the app's traced node_modules tree.
+RUN npm install --omit=dev --no-package-lock --prefix /app/scripts/garmin-sidecar
+
 # `output: "standalone"` only traces node_modules actually reachable from the
 # Next.js app's own bundle -- pg (used by scripts/*.mjs too) rides along for
 # free because lib/db.ts already pulls it in for the app itself, but `ws`
