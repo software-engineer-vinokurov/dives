@@ -225,7 +225,11 @@ keda:
   interceptorProxyPort: 8080
   externalScalerAddress: keda-add-ons-http-external-scaler.keda:9090
   minReplicaCount: 0
-  maxReplicaCount: 3
+  # Capped at 1, never higher: this is a single-instance app by policy --
+  # KEDA may only ever toggle the web Deployment between 0 and 1, never
+  # scale it out. (The notification-worker / padi-token-refresh CronJobs
+  # are separate resources and unaffected either way.)
+  maxReplicaCount: 1
   cooldownPeriod: 300
   requestRateTargetValue: 5
   requestRateWindow: 1m
