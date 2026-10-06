@@ -99,6 +99,16 @@ Agents doing work in this repo must track that work with a Gitea issue:
   follow-up comment).
 - Reference the issue number in every commit made for that work (e.g.
   `Fixes #42` or `Refs #42` in the commit message).
+- If this repo (or its org) has a Gitea Project board, link new issues to it
+  and move them between columns using the `gitea-cli-extras` CLI
+  (`https://gitea.pumpking.aleksandr.vin/software-engineer-vinokurov/gitea-cli-extras`)
+  — Gitea has no REST API for Projects, so this drives the actual web UI via
+  a saved browser login. Run `gitea-cli-extras login --url
+  https://gitea.pumpking.aleksandr.vin` once, then `gitea-cli-extras project
+  link-issue --issue-url <issue-url> --project-url <project-url>` and
+  `gitea-cli-extras project move-issue --project-url <project-url>
+  --issue-url <issue-url> --column "<column>"`. Ask the user for the
+  project URL and target column if they aren't already known.
 - When the work is done, do **not** close the issue or change its status
   yourself.
   Leave it open and ask the user to review the work and close (or
