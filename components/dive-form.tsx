@@ -42,6 +42,7 @@ import { toDateTimeLocalValue, trimNumeric } from "@/lib/dive-format";
 import type { DiveInput, DiveRecord, RecentCylinder } from "@/lib/dives";
 import { computeGasConsumption } from "@/lib/gas-consumption";
 import { pickMergeSource } from "@/lib/merge-fields";
+import { PADI_WEATHER_VALUES } from "@/lib/padi/enum-map";
 import { cn } from "@/lib/utils";
 
 // Radix's Select has no concept of an empty value (an empty-string SelectItem throws), so
@@ -1051,7 +1052,11 @@ export function DiveForm({
             onChange={(next) => set("waves", next)}
             warnUnrecognized
           />
-          <Field id="weather" label="Weather">
+          <Field
+            id="weather"
+            label="Weather"
+            hint={`For PADI export, include one of: ${PADI_WEATHER_VALUES.join(", ")} (any case).`}
+          >
             <Input
               id="weather"
               placeholder={neutralPlaceholder("Sunny, light chop")}

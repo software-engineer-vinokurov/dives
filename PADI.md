@@ -109,6 +109,7 @@ apart:
 | Visibility distance `<=5m` / `<=15m` / `>15m` | `visibility = Low` / `Average` / `High` (PADI rejects `Medium`) |
 | `gas_mix = Air` | `gas_mixture = Air`, `oxygen = 21`, `nitrogen = 79`, `helium = 0` |
 | `gas_mix = EAN32` | `gas_mixture = Nitrox`, `oxygen = 32`, `nitrogen = 68`, `helium = 0` |
+| Free-form `weather` like `sunny, light chop` | `weather = Sunny`. `mapWeatherToPadi` (`enum-map.ts`) looks for PADI's six values (`Sunny`, `Partly Cloudy`, `Cloudy`, `Rainy`, `Windy`, `Foggy`) as whole words, any case (`partly-cloudy` also counts); the one appearing first in the text wins. No match sends `null`, never the raw text (issue #60). The dive form's Weather hint lists the words. Import is unchanged: PADI's value is stored as-is |
 | Free-form `tank_info` like `2x7L, Steel 232bar` | `cylinder_type = Steel`, `cylinder_size = 14`; PADI gets only its material enum plus numeric size, never the raw custom text |
 
 Once `padi_dive_id` is present the detail page hides the create button. If sync or a local edit marks

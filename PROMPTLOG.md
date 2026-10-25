@@ -1452,3 +1452,7 @@ Fixed by deriving a `mergeSourceLabel` ("Suunto"/"Garmin") from `suuntoImportId`
 ## 2026-10-01 16:01 CEST — Commit Garmin port reassignment
 
 > сщььше
+
+## 2026-10-25 16:10 CET — PADI weather mapping (issue #60)
+
+> /autopilot work on https://gitea.pumpking.aleksandr.vin/software-engineer-vinokurov/dives/issues/60

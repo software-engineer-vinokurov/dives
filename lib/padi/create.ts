@@ -11,6 +11,7 @@ import {
   PADI_SURGE_BY_APP_INTENSITY,
   PADI_WAVES_BY_APP_INTENSITY,
   PADI_WEIGHT_BY_APP_WEIGHT,
+  mapWeatherToPadi,
 } from "./enum-map";
 
 export type CreatePadiDiveResult =
@@ -186,7 +187,7 @@ export function mapDiveToPadiCreateInput(dive: DiveRecord, affiliateId: string |
       data: {
         water_type: trimString(dive.water_type),
         body_of_water: trimString(dive.body_of_water) ?? "Other",
-        weather: trimString(dive.weather),
+        weather: mapWeatherToPadi(dive.weather),
         air_temp: toPadiNumberString(dive.air_temp, 3),
         surface_water_temp: toPadiNumberString(dive.water_temp, 3),
         bottom_water_temp: toPadiNumberString(dive.water_temp_low, 3),
@@ -256,7 +257,7 @@ export function mapDiveToPadiUpdatePayload(
     conditions: {
       water_type: trimString(dive.water_type),
       body_of_water: trimString(dive.body_of_water) ?? "Other",
-      weather: trimString(dive.weather),
+      weather: mapWeatherToPadi(dive.weather),
       air_temp: toPadiNumber(dive.air_temp),
       surface_water_temp: toPadiNumber(dive.water_temp),
       bottom_water_temp: toPadiNumber(dive.water_temp_low),

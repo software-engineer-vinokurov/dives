@@ -58,3 +58,26 @@ export const PADI_SURGE_BY_APP_INTENSITY: Record<string, string> = {
   Strong: "StrongSurge",
 };
 export const APP_SURGE_BY_PADI_SURGE: Record<string, string> = invert(PADI_SURGE_BY_APP_INTENSITY);
+
+// PADI's logbook accepts only these weather values (issue #60). Unlike the maps above, the app side
+// is free text, so this is a keyword search rather than an exact lookup. "partly cloudy" maps to Partly Cloudy, not
+// Cloudy, because its match starts earlier in the text.
+export const PADI_WEATHER_VALUES = ["Sunny", "Partly Cloudy", "Cloudy", "Rainy", "Windy", "Foggy"] as const;
+
+const PADI_WEATHER_PATTERNS = PADI_WEATHER_VALUES.map((value) => ({
+  value,
+  pattern: new RegExp(`\\b${value.replace(" ", "[\\s-]+")}\\b`, "i"),
+}));
+
+// Returns the PADI weather value whose keyword appears earliest in the free-text weather field
+// (case-insensitive, whole words), e.g. "light rain, rainy and windy" -> "Rainy". Returns null when
+// none of the keywords appear, so PADI never receives a value it doesn't support.
+export function mapWeatherToPadi(weather: string | null): string | null {
+  if (!weather) return null;
+  let best: { value: string; index: number } | null = null;
+  for (const { value, pattern } of PADI_WEATHER_PATTERNS) {
+    const index = weather.search(pattern);
+    if (index !== -1 && (best === null || index < best.index)) best = { value, index };
+  }
+  return best?.value ?? null;
+}

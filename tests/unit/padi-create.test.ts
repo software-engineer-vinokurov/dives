@@ -140,6 +140,19 @@ describe("mapDiveToPadiCreateInput", () => {
     ).toMatchObject({ conditions: { data: { visibility: "High", visibility_distance: "20.000" } } });
   });
 
+  it("maps free-text weather onto PADI's weather values, or null when nothing matches", () => {
+    const now = new Date("2026-09-05T13:17:42.000Z");
+    expect(mapDiveToPadiCreateInput({ ...baseDive, weather: "sunny, light chop" }, "29837190", now)).toMatchObject({
+      conditions: { data: { weather: "Sunny" } },
+    });
+    expect(mapDiveToPadiCreateInput({ ...baseDive, weather: "Overcast" }, "29837190", now)).toMatchObject({
+      conditions: { data: { weather: null } },
+    });
+    expect(
+      mapDiveToPadiUpdatePayload({ ...baseDive, padi_dive_id: 7, weather: "a bit windy" }, "29837190", now),
+    ).toMatchObject({ conditions: { weather: "Windy" } });
+  });
+
   it("builds the captured PADI recreational update payload using numbers for set inputs", () => {
     const result = mapDiveToPadiUpdatePayload(
       {
