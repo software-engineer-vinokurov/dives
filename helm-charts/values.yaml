@@ -89,6 +89,10 @@ backfills:
   enabled: true
 
 notifications:
+  # deployment: one long-running worker looping every loopIntervalMs
+  # (pumpking#34). cronjob: the previous CronJob on `schedule`.
+  mode: deployment
+  loopIntervalMs: "120000"
   schedule: "*/2 * * * *"
   batchSize: "50"
   gapMs: "1500"

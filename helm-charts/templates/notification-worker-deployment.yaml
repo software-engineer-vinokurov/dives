@@ -1,0 +1,83 @@
+{{- if eq (.Values.notifications.mode | default "deployment") "deployment" }}
+# Long-running notification worker (pumpking#34): one pod looping every
+# notifications.loopIntervalMs instead of a CronJob pod every 2 min.
+# notifications.mode: cronjob switches back to templates/cronjob.yaml.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-notification-worker"
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}-notification-worker"
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  # Recreate: never two workers mid-pass at once during a rollout (the queue's
+  # claim locks would cope, but one at a time keeps sends strictly paced).
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Release.Name }}-notification-worker"
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: notification-worker-loop
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "{{ .Release.Name }}-notification-worker"
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: notification-worker-loop
+    spec:
+      # SIGTERM lets the current pass finish: up to batchSize x gapMs
+      # (50 x 1.5s = 75s by default) plus DB/SMTP time.
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: notification-worker
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["node"]
+          args: ["scripts/notification-worker.mjs"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: OTEL_SERVICE_VERSION
+              value: "{{ .Values.deploymentId }}"
+            - name: NOTIFICATIONS_LOOP_INTERVAL_MS
+              value: {{ .Values.notifications.loopIntervalMs | quote }}
+            - name: NOTIFICATIONS_BATCH_SIZE
+              value: {{ .Values.notifications.batchSize | quote }}
+            - name: NOTIFICATIONS_GAP_MS
+              value: {{ .Values.notifications.gapMs | quote }}
+            - name: NOTIFICATIONS_RETRY_BASE_MS
+              value: {{ .Values.notifications.retryBaseMs | quote }}
+            - name: NOTIFICATIONS_MAX_BACKOFF_MS
+              value: {{ .Values.notifications.maxBackoffMs | quote }}
+            - name: NOTIFICATIONS_STALE_LOCK_MS
+              value: {{ .Values.notifications.staleLockMs | quote }}
+            - name: NOTIFICATIONS_MAX_ATTEMPTS
+              value: {{ .Values.notifications.maxAttempts | quote }}
+          {{- range $key, $value := .Values.env }}
+            - name: {{ $key | quote }}
+              value: {{ $value | quote }}
+          {{- end }}
+          {{- range $key, $_ := .Values.appSecrets }}
+            - name: {{ $key | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ $.Release.Name }}-app-secrets"
+                  key: {{ $key | quote }}
+          {{- end }}
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseApp.secretName is required" .Values.databaseApp.secretName | quote }}
+                  key: {{ .Values.databaseApp.usernameKey | quote }}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseApp.secretName is required" .Values.databaseApp.secretName | quote }}
+                  key: {{ .Values.databaseApp.passwordKey | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}
