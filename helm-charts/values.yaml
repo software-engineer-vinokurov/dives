@@ -106,6 +106,10 @@ notifications:
 # key here -- it's only ever needed transiently during an active key rotation, added directly to
 # the stage's real secrets file at rotation time and removed once rotation completes.
 padiTokenRefresh:
+  # deployment: one long-running pod re-running the job every intervalSeconds
+  # (was a CronJob every 30 min, pumpking#34). cronjob: back to `schedule`.
+  mode: deployment
+  intervalSeconds: "1800"
   schedule: "*/30 * * * *"
 
 garminSidecar:

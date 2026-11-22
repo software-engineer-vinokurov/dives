@@ -1,0 +1,88 @@
+{{- if (eq (.Values.padiTokenRefresh.mode | default "deployment") "deployment") }}
+# padi-token-refresh: one long-running pod re-running the job every
+# padiTokenRefresh.intervalSeconds instead of a CronJob pod per run (pumpking#34).
+# padiTokenRefresh.mode: cronjob switches back to the CronJob.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: "{{ .Release.Name }}-padi-token-refresh"
+  labels:
+    app.kubernetes.io/name: "{{ .Release.Name }}-padi-token-refresh"
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: "{{ .Release.Name }}-padi-token-refresh"
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: padi-token-refresh-loop
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: "{{ .Release.Name }}-padi-token-refresh"
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: padi-token-refresh-loop
+    spec:
+      # SIGTERM lets the run in progress finish (the loop doesn't forward
+      # it), then the pod exits; killed after this grace period.
+      terminationGracePeriodSeconds: 300
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: padi-token-refresh
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Same command the CronJob ran, wrapped in a loop (pumpking#34).
+          command:
+            - sh
+            - -c
+            - |
+              interval="${LOOP_INTERVAL_SECONDS:?LOOP_INTERVAL_SECONDS is required}"
+              stop=0; sleeper=""
+              trap 'stop=1; [ -n "$sleeper" ] && kill "$sleeper" 2>/dev/null' TERM INT
+              echo "loop: every ${interval}s: $*"
+              while [ "$stop" = 0 ]; do
+                "$@" & run=$!
+                rc=0
+                while kill -0 "$run" 2>/dev/null; do wait "$run"; rc=$?; done
+                [ "$rc" -ne 0 ] && echo "loop: run exited $rc"
+                [ "$stop" = 1 ] && break
+                sleep "$interval" & sleeper=$!
+                wait "$sleeper"; sleeper=""
+              done
+              echo "loop: stopped"
+            - loop
+          args: ["node", "scripts/padi-token-refresh.mjs"]
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: LOOP_INTERVAL_SECONDS
+              value: {{ .Values.padiTokenRefresh.intervalSeconds | quote }}
+            - name: OTEL_SERVICE_VERSION
+              value: "{{ .Values.deploymentId }}"
+          {{- range $key, $value := .Values.env }}
+            - name: {{ $key | quote }}
+              value: {{ $value | quote }}
+          {{- end }}
+          {{- range $key, $_ := .Values.appSecrets }}
+            - name: {{ $key | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: "{{ $.Release.Name }}-app-secrets"
+                  key: {{ $key | quote }}
+          {{- end }}
+            - name: DATABASE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseApp.secretName is required" .Values.databaseApp.secretName | quote }}
+                  key: {{ .Values.databaseApp.usernameKey | quote }}
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "databaseApp.secretName is required" .Values.databaseApp.secretName | quote }}
+                  key: {{ .Values.databaseApp.passwordKey | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- end }}

@@ -1,3 +1,4 @@
+{{- if (eq (.Values.padiTokenRefresh.mode | default "deployment") "cronjob") }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -57,3 +58,4 @@ spec:
                       key: {{ .Values.databaseApp.passwordKey | quote }}
               resources:
                 {{- toYaml .Values.resources | nindent 16 }}
+{{- end }}
